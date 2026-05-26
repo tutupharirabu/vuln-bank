@@ -921,6 +921,307 @@ def internal_config():
     return jsonify(cfg)
 
 
+# =============================================================================
+# VULNERABILITY: SR-02 Testing - Network Segmentation Bypass
+# =============================================================================
+# Endpoints di bawah ini sengaja dibuat vulnerable untuk menguji efektivitas
+# segmentasi jaringan antara web server publik dan database internal.
+
+
+import re
+import socket
+import subprocess
+
+
+@app.route("/api/internal/network-scanner", methods=["POST"])
+@token_required
+def internal_network_scanner(current_user):
+    """
+    VULNERABILITY: Internal Network Scanner (CWE-284: Improper Access Control)
+    - CWE-200: Information Disclosure
+    - CWE-668: Exposure of Resource to Wrong Sphere
+
+    Endpoint ini seharusnya TIDAK ADA di production.
+    Dibuat untuk SR-02 testing - menguji apakah attacker bisa
+    memindai internal network dari web server di DMZ.
+
+    Attacker yang sudah punya token (dari login) bisa:
+    - Scan subnet internal network
+    - Discover database server dan port yang terbuka
+    - Mapping network topology internal
+    """
+    data = request.get_json() or {}
+    target_host = data.get("host", "db")
+    target_port = data.get("port", 5432)
+    timeout = data.get("timeout", 2)
+
+    # VULNERABILITY: Tidak ada validasi target host/port
+    # Attacker bisa scan sembarang host di internal network
+    try:
+        # Resolve hostname to IP
+        ip_address = socket.gethostbyname(target_host)
+
+        # Attempt connection to target port
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip_address, target_port))
+        sock.close()
+
+        port_status = "open" if result == 0 else "closed"
+
+        # VULNERABILITY: Excessive information disclosure
+        # Attacker mendapatkan informasi network internal
+        return jsonify(
+            {
+                "status": "success",
+                "scan_result": {
+                    "target_host": target_host,
+                    "target_ip": ip_address,
+                    "target_port": target_port,
+                    "port_status": port_status,
+                    "protocol": "tcp",
+                },
+                "debug_info": {
+                    "web_server_hostname": socket.gethostname(),
+                    "web_server_ip": socket.gethostbyname(socket.gethostname()),
+                    "dns_resolver": socket.getfqdn(),
+                },
+            }
+        )
+
+    except socket.gaierror as e:
+        return jsonify(
+            {
+                "status": "error",
+                "error": f"Could not resolve hostname: {target_host}",
+                "details": str(e),  # VULNERABILITY: Detail error exposure
+            }
+        ), 400
+    except Exception as e:
+        return jsonify(
+            {
+                "status": "error",
+                "error": "Scan failed",
+                "details": str(e),  # VULNERABILITY: Detail error exposure
+            }
+        ), 500
+
+
+@app.route("/api/internal/network-scan-range", methods=["POST"])
+@token_required
+def internal_network_scan_range(current_user):
+    """
+    VULNERABILITY: Internal Network Range Scanner (CWE-284, CWE-200)
+
+    Attacker bisa scan seluruh range subnet internal network
+    untuk menemukan semua service yang berjalan.
+    """
+    data = request.get_json() or {}
+    subnet = data.get("subnet", "172.20.1")  # Default internal network
+    port_range = data.get("port_range", "5432,6379,3306,8080,9090")
+    timeout = data.get("timeout", 1)
+
+    # Parse ports
+    try:
+        ports = [int(p.strip()) for p in port_range.split(",")]
+    except ValueError:
+        return jsonify({"error": "Invalid port range"}), 400
+
+    results = []
+
+    # VULNERABILITY: Scan entire subnet
+    # This simulates an attacker mapping the internal network
+    for i in range(1, 255):
+        target_ip = f"{subnet}.{i}"
+        for port in ports:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(timeout)
+                result = sock.connect_ex((target_ip, port))
+                sock.close()
+
+                if result == 0:
+                    results.append({"ip": target_ip, "port": port, "status": "open"})
+            except Exception:
+                pass
+
+    # VULNERABILITY: Returns full network map
+    return jsonify(
+        {
+            "status": "success",
+            "subnet": subnet,
+            "ports_scanned": ports,
+            "open_ports": results,
+            "total_found": len(results),
+            "note": "This endpoint should NOT exist in production!",
+        }
+    )
+
+
+@app.route("/api/internal/db-debug", methods=["POST"])
+@token_required
+def db_debug_endpoint(current_user):
+    """
+    VULNERABILITY: Direct Database Query Endpoint (CWE-89: SQL Injection)
+    - CWE-284: Improper Access Control
+    - CWE-200: Information Disclosure
+
+    Endpoint ini seharusnya HANYA untuk debugging dan TIDAK boleh
+    diakses dari external. Dibuat untuk SR-02 testing - menguji
+    apakah attacker bisa query database langsung.
+
+    Risk: Attacker bisa extract semua data private (NIK, Biometrik, Rekening)
+    """
+    data = request.get_json() or {}
+    query = data.get("query", "")
+
+    if not query:
+        return jsonify({"error": "Query parameter is required"}), 400
+
+    # VULNERABILITY: No query validation
+    # Attacker bisa execute arbitrary SQL queries
+    # VULNERABILITY: SQL Injection possible
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(query)  # VULNERABILITY: Direct SQL execution!
+
+        # Try to fetch results
+        try:
+            results = cur.fetchall()
+            columns = [desc[0] for desc in cur.description]
+            cur.close()
+            return_connection(conn)
+
+            # VULNERABILITY: Excessive data exposure
+            return jsonify(
+                {
+                    "status": "success",
+                    "query": query,
+                    "columns": columns,
+                    "rows": [dict(zip(columns, row)) for row in results],
+                    "row_count": len(results),
+                    "warning": "This endpoint exposes raw database access!",
+                }
+            )
+        except psycopg2.ProgrammingError:
+            # For INSERT/UPDATE/DELETE queries
+            conn.commit()
+            cur.close()
+            return_connection(conn)
+            return jsonify(
+                {
+                    "status": "success",
+                    "query": query,
+                    "rows_affected": cur.rowcount,
+                    "note": "Non-SELECT query executed",
+                }
+            )
+
+    except Exception as e:
+        return jsonify(
+            {
+                "status": "error",
+                "query": query,
+                "error": str(e),  # VULNERABILITY: Detailed error exposure
+            }
+        ), 500
+
+
+@app.route("/api/internal/service-proxy", methods=["POST"])
+@token_required
+def internal_service_proxy(current_user):
+    """
+    VULNERABILITY: Internal Service Proxy / SSRF (CWE-918)
+    - CWE-284: Improper Access Control
+
+    Attacker bisa menggunakan endpoint ini sebagai proxy
+    untuk mengakses internal services yang seharusnya
+    tidak accessible dari DMZ.
+
+    Contoh target:
+    - http://db:5432 (PostgreSQL)
+    - http://127.0.0.1:5000/internal/secret (loopback bypass)
+    - http://redis:6379 (Redis cache)
+    """
+    data = request.get_json() or {}
+    target_url = data.get("url", "")
+    method = data.get("method", "GET").upper()
+    headers = data.get("headers", {})
+    body = data.get("body", None)
+
+    if not target_url:
+        return jsonify({"error": "URL parameter is required"}), 400
+
+    # VULNERABILITY: No URL validation
+    # Attacker bisa akses sembarang URL di internal network
+    try:
+        resp = requests.request(
+            method=method,
+            url=target_url,
+            headers=headers,
+            data=body,
+            timeout=10,
+            allow_redirects=True,
+            verify=False,  # VULNERABILITY: SSL verification disabled
+        )
+
+        # VULNERABILITY: Full response exposure
+        return jsonify(
+            {
+                "status": "success",
+                "target_url": target_url,
+                "status_code": resp.status_code,
+                "headers": dict(resp.headers),
+                "content": resp.text[:5000],  # First 5000 chars
+                "warning": "This proxy can access ANY internal service!",
+            }
+        )
+
+    except Exception as e:
+        return jsonify(
+            {"status": "error", "target_url": target_url, "error": str(e)}
+        ), 500
+
+
+@app.route("/api/internal/ping", methods=["POST"])
+@token_required
+def internal_ping(current_user):
+    """
+    VULNERABILITY: Internal Ping/ICMP Scanner (CWE-284)
+
+    Attacker bisa menggunakan ini untuk discover hosts
+    di internal network menggunakan ICMP ping.
+    """
+    data = request.get_json() or {}
+    target = data.get("host", "db")
+    count = data.get("count", 3)
+
+    # VULNERABILITY: Command injection possible
+    # subprocess dengan shell=True sangat dangerous
+    try:
+        result = subprocess.run(
+            ["ping", "-c", str(count), target],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        return jsonify(
+            {
+                "status": "success",
+                "target": target,
+                "return_code": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "reachable": result.returncode == 0,
+            }
+        )
+
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+
+
 # Cloud metadata mock (e.g., AWS IMDS) for SSRF demos
 @app.route("/latest/meta-data/", methods=["GET"])
 def metadata_root():

@@ -1,12 +1,32 @@
 services:
+  # === DMZ: Public-facing Reverse Proxy ===
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    networks:
+      - dmz
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+  # === DMZ: Web Application (Public-facing server) ===
   web:
     build: .
     restart: unless-stopped
+    # Exposed for direct SR-02 testing (simulates compromised web server)
     ports:
       - "5001:5000"
       - "81:5000"
-      # - "443:5000"
-
     environment:
       - DB_NAME=vulnerable_bank
       - DB_USER=postgres
@@ -19,8 +39,17 @@ services:
     volumes:
       - ./static/uploads:/app/static/uploads
     networks:
-      - vuln_network
+      - dmz
+      - internal
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
+  # === INTERNAL: Database (Private data - NIK, Biometrik, Rekening) ===
+  # VULNERABILITY: Port 5432 terekspos ke host (simulasi misconfiguration untuk SR-02)
+  # Dalam production seharusnya TIDAK ada ports exposed
   db:
     image: postgres:13
     restart: unless-stopped
@@ -29,21 +58,43 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
     ports:
+      # SR-02: Port ini terekspos untuk testing segmentasi jaringan
+      # Attacker bisa coba akses DB langsung dari host
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - vuln_network
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d vulnerable_bank"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
 volumes:
   postgres_data:
 
 networks:
-  vuln_network:
+  dmz:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+    labels:
+      - "zone=dmz"
+      - "description=Public-facing services (proxy, web)"
+  internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+    labels:
+      - "zone=internal"
+      - "description=Restricted - Database with private data (NIK, Biometrik, Rekening)"

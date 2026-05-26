@@ -20,13 +20,10 @@ services:
           memory: 128M
 
   # === DMZ: Web Application (Public-facing server) ===
+  # TIDAK exposed langsung ke host - akses HANYA via proxy
   web:
     build: .
     restart: unless-stopped
-    # Exposed for direct SR-02 testing (simulates compromised web server)
-    ports:
-      - "5001:5000"
-      - "81:5000"
     environment:
       - DB_NAME=vulnerable_bank
       - DB_USER=postgres
@@ -48,8 +45,7 @@ services:
           memory: 512M
 
   # === INTERNAL: Database (Private data - NIK, Biometrik, Rekening) ===
-  # VULNERABILITY: Port 5432 terekspos ke host (simulasi misconfiguration untuk SR-02)
-  # Dalam production seharusnya TIDAK ada ports exposed
+  # Database on-premise simulation - TIDAK exposed ke host
   db:
     image: postgres:13
     restart: unless-stopped
@@ -57,10 +53,7 @@ services:
       - POSTGRES_DB=vulnerable_bank
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-    ports:
-      # SR-02: Port ini terekspos untuk testing segmentasi jaringan
-      # Attacker bisa coba akses DB langsung dari host
-      - "5432:5432"
+    # NO ports exposed - only accessible from internal network (via web app)
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:

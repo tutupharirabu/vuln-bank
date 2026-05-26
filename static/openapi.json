@@ -1,17 +1,17 @@
 {
   "openapi": "3.0.0",
   "info": {
-    "title": "Vulnerable Bank API",
+    "title": "My Bank Gweh API",
     "description": "API documentation for the deliberately vulnerable banking application",
     "version": "1.0.0",
     "contact": {
-      "name": "Vulnerable Bank Support",
+      "name": "My Bank Gweh Support",
       "url": "https://github.com/Commando-X/vuln-bank"
     }
   },
   "servers": [
     {
-      "url": "https://vulnbank.org",
+      "url": "https://mybankgweh.org",
       "description": "Controlled Production Server"
     }
   ],
@@ -457,8 +457,8 @@
         "summary": "Internal secrets (SSRF demo)",
         "description": "Returns sensitive application secrets and environment previews. Intended to be reachable only from loopback; fetch via SSRF using the URL-import endpoint.",
         "responses": {
-          "200": {"description": "Secrets returned"},
-          "403": {"description": "Forbidden (non-loopback)"}
+          "200": { "description": "Secrets returned" },
+          "403": { "description": "Forbidden (non-loopback)" }
         }
       }
     },
@@ -468,8 +468,8 @@
         "summary": "Internal config (SSRF demo)",
         "description": "Returns app configuration JSON. Intended for SSRF demonstrations.",
         "responses": {
-          "200": {"description": "Config returned"},
-          "403": {"description": "Forbidden (non-loopback)"}
+          "200": { "description": "Config returned" },
+          "403": { "description": "Forbidden (non-loopback)" }
         }
       }
     },
@@ -479,8 +479,8 @@
         "summary": "Cloud metadata root (mock)",
         "description": "Mimics a cloud instance metadata service root directory.",
         "responses": {
-          "200": {"description": "Directory listing returned"},
-          "403": {"description": "Forbidden (non-loopback)"}
+          "200": { "description": "Directory listing returned" },
+          "403": { "description": "Forbidden (non-loopback)" }
         }
       }
     },
@@ -489,18 +489,18 @@
         "tags": ["internal"],
         "summary": "Metadata IAM roles (mock)",
         "responses": {
-          "200": {"description": "Role list returned"},
-          "403": {"description": "Forbidden (non-loopback)"}
+          "200": { "description": "Role list returned" },
+          "403": { "description": "Forbidden (non-loopback)" }
         }
       }
     },
-    "/latest/meta-data/iam/security-credentials/vulnbank-role": {
+    "/latest/meta-data/iam/security-credentials/mybankgweh-role": {
       "get": {
         "tags": ["internal"],
         "summary": "Metadata IAM role credentials (mock)",
         "responses": {
-          "200": {"description": "Credentials document returned"},
-          "403": {"description": "Forbidden (non-loopback)"}
+          "200": { "description": "Credentials document returned" },
+          "403": { "description": "Forbidden (non-loopback)" }
         }
       }
     },
@@ -1070,7 +1070,7 @@
                   },
                   "amount": {
                     "type": "number",
-                    "example": 100.00,
+                    "example": 100.0,
                     "description": "No amount validation"
                   },
                   "payment_method": {
@@ -1425,7 +1425,11 @@
                           "items": {
                             "type": "string"
                           },
-                          "example": ["Prompt Injection", "Information Disclosure", "Broken Authorization"]
+                          "example": [
+                            "Prompt Injection",
+                            "Information Disclosure",
+                            "Broken Authorization"
+                          ]
                         }
                       }
                     },
@@ -1478,7 +1482,10 @@
                 "type": "object",
                 "properties": {
                   "name": { "type": "string", "example": "Demo Ecommerce" },
-                  "email": { "type": "string", "example": "merchant@example.com" },
+                  "email": {
+                    "type": "string",
+                    "example": "merchant@example.com"
+                  },
                   "password": { "type": "string", "example": "password123" }
                 }
               }
@@ -1507,7 +1514,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": { "type": "string", "example": "merchant@example.com" },
+                  "email": {
+                    "type": "string",
+                    "example": "merchant@example.com"
+                  },
                   "password": { "type": "string", "example": "password123" }
                 }
               }
@@ -1529,10 +1539,7 @@
         "tags": ["merchants"],
         "summary": "Get current merchant",
         "description": "Return the authenticated merchant. Accepts either X-Merchant-Api-Key or Bearer merchant JWT.",
-        "security": [
-          { "MerchantApiKey": [] },
-          { "BearerAuth": [] }
-        ],
+        "security": [{ "MerchantApiKey": [] }, { "BearerAuth": [] }],
         "responses": {
           "200": {
             "description": "Merchant profile"
@@ -1546,12 +1553,9 @@
     "/api/v1/payments/charge": {
       "post": {
         "tags": ["merchant-payments"],
-        "summary": "Charge a Vulnbank virtual card",
-        "description": "Process a merchant payment using Vulnbank virtual card details.",
-        "security": [
-          { "MerchantApiKey": [] },
-          { "BearerAuth": [] }
-        ],
+        "summary": "Charge a My Bank Gweh virtual card",
+        "description": "Process a merchant payment using My Bank Gweh virtual card details.",
+        "security": [{ "MerchantApiKey": [] }, { "BearerAuth": [] }],
         "requestBody": {
           "required": true,
           "content": {
@@ -1561,11 +1565,20 @@
                 "properties": {
                   "amount": { "type": "number", "example": 49.99 },
                   "currency": { "type": "string", "example": "USD" },
-                  "card_number": { "type": "string", "example": "4111111111111111" },
+                  "card_number": {
+                    "type": "string",
+                    "example": "4111111111111111"
+                  },
                   "cvv": { "type": "string", "example": "123" },
                   "expiry_date": { "type": "string", "example": "12/28" },
-                  "merchant_order_id": { "type": "string", "example": "ORDER-1001" },
-                  "description": { "type": "string", "example": "Demo ecommerce checkout" }
+                  "merchant_order_id": {
+                    "type": "string",
+                    "example": "ORDER-1001"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Demo ecommerce checkout"
+                  }
                 }
               }
             }
@@ -1589,10 +1602,7 @@
         "tags": ["merchant-payments"],
         "summary": "Get merchant payment",
         "description": "Retrieve one payment by ID for the authenticated merchant.",
-        "security": [
-          { "MerchantApiKey": [] },
-          { "BearerAuth": [] }
-        ],
+        "security": [{ "MerchantApiKey": [] }, { "BearerAuth": [] }],
         "parameters": [
           {
             "name": "payment_id",
@@ -1616,10 +1626,7 @@
         "tags": ["merchant-payments"],
         "summary": "List merchant payments",
         "description": "List payments for the authenticated merchant.",
-        "security": [
-          { "MerchantApiKey": [] },
-          { "BearerAuth": [] }
-        ],
+        "security": [{ "MerchantApiKey": [] }, { "BearerAuth": [] }],
         "responses": {
           "200": {
             "description": "Merchant payments"
@@ -1635,10 +1642,7 @@
         "tags": ["merchant-payments"],
         "summary": "List payments by merchant ID",
         "description": "List payments for the merchant ID supplied in the path.",
-        "security": [
-          { "MerchantApiKey": [] },
-          { "BearerAuth": [] }
-        ],
+        "security": [{ "MerchantApiKey": [] }, { "BearerAuth": [] }],
         "parameters": [
           {
             "name": "merchant_id",

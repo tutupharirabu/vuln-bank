@@ -1,4 +1,4 @@
-name: Reset VulnBank
+name: Reset My Bank Gweh
 
 # Wipes the DB volume and any user-uploaded files so the training app
 # returns to a fresh state. Runs every 3 weeks at midnight WAT
@@ -7,7 +7,7 @@ name: Reset VulnBank
 
 on:
   schedule:
-    - cron: '0 23 * * 6'
+    - cron: "0 23 * * 6"
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
 
     environment:
       name: production
-      url: https://vulnbank.org
+      url: https://mybankgweh.org
 
     steps:
       - name: Skip unless ISO week is on the 3-week cadence
@@ -65,7 +65,7 @@ jobs:
         if: env.SKIP != 'true'
         run: |
           for i in {1..18}; do
-            curl -fsS https://vulnbank.org && exit 0
+            curl -fsS https://mybankgweh.org && exit 0
             sleep 5
           done
           echo "Health check failed after reset"

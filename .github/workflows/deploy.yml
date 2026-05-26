@@ -1,4 +1,4 @@
-name: Deploy VulnBank
+name: Deploy My Bank Gweh
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
 
     environment:
       name: production
-      url: https://vulnbank.org
+      url: https://mybankgweh.org
 
     steps:
       - name: Checkout code
@@ -61,4 +61,4 @@ jobs:
       - name: Health Check
         run: |
           sleep 20
-          curl -f https://vulnbank.org || (echo "Health check failed" && exit 1)
+          curl -f https://mybankgweh.org || (echo "Health check failed" && exit 1)

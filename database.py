@@ -1,24 +1,30 @@
 import os
+import time
+from datetime import datetime
+
 import psycopg2
 from psycopg2 import pool
-from datetime import datetime
-import time
 
 # Vulnerable database configuration
 # CWE-259: Use of Hard-coded Password
 # CWE-798: Use of Hard-coded Credentials
 DB_CONFIG = {
-    'dbname': os.getenv('DB_NAME', 'vulnerable_bank'),
-    'user': os.getenv('DB_USER', 'postgres'),
-    'password': os.getenv('DB_PASSWORD', 'postgres'),  # Hardcoded password in default value
-    'host': os.getenv('DB_HOST', 'localhost'),
-    'port': os.getenv('DB_PORT', '5432')
+    "dbname": os.getenv("DB_NAME", "vulnerable_bank"),
+    "user": os.getenv("DB_USER", "postgres"),
+    "password": os.getenv(
+        "DB_PASSWORD", "postgres"
+    ),  # Hardcoded password in default value
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": os.getenv("DB_PORT", "5432"),
 }
 
 # Create a connection pool
 connection_pool = None
 
-def init_connection_pool(min_connections=2, max_connections=30, max_retries=5, retry_delay=2):
+
+def init_connection_pool(
+    min_connections=2, max_connections=30, max_retries=5, retry_delay=2
+):
     """
     Initialize the database connection pool with retry mechanism
     Vulnerability: No connection encryption enforced
@@ -28,25 +34,26 @@ def init_connection_pool(min_connections=2, max_connections=30, max_retries=5, r
         return connection_pool
 
     retry_count = 0
-    
+
     while retry_count < max_retries:
         try:
             connection_pool = psycopg2.pool.ThreadedConnectionPool(
-                min_connections,
-                max_connections,
-                **DB_CONFIG
+                min_connections, max_connections, **DB_CONFIG
             )
             print("Database connection pool created successfully")
             return connection_pool
         except Exception as e:
             retry_count += 1
-            print(f"Failed to connect to database (attempt {retry_count}/{max_retries}): {e}")
+            print(
+                f"Failed to connect to database (attempt {retry_count}/{max_retries}): {e}"
+            )
             if retry_count < max_retries:
                 print(f"Retrying in {retry_delay} seconds...")
                 time.sleep(retry_delay)
             else:
                 print("Max retries reached. Could not establish database connection.")
                 raise e
+
 
 def check_database_connection():
     conn = None
@@ -63,12 +70,13 @@ def check_database_connection():
         if conn:
             return_connection(conn)
 
+
 def get_connection():
     if not connection_pool:
         raise Exception("Connection pool not initialized")
 
-    max_attempts = max(1, int(os.getenv('DB_POOL_CHECKOUT_ATTEMPTS', '3')))
-    retry_delay = float(os.getenv('DB_POOL_CHECKOUT_RETRY_DELAY', '0.2'))
+    max_attempts = max(1, int(os.getenv("DB_POOL_CHECKOUT_ATTEMPTS", "3")))
+    retry_delay = float(os.getenv("DB_POOL_CHECKOUT_RETRY_DELAY", "0.2"))
 
     for attempt in range(1, max_attempts + 1):
         try:
@@ -83,9 +91,11 @@ def get_connection():
             )
             time.sleep(retry_delay)
 
+
 def return_connection(connection):
     if connection_pool:
         connection_pool.putconn(connection)
+
 
 def init_db():
     """
@@ -96,7 +106,7 @@ def init_db():
     try:
         with conn.cursor() as cursor:
             # Create users table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     username TEXT NOT NULL UNIQUE,
@@ -109,7 +119,7 @@ def init_db():
                     bio TEXT,  -- Vulnerability: Stored XSS - User bio without sanitization
                     is_suspended BOOLEAN DEFAULT FALSE
                 )
-            ''')
+            """)
 
             # Migration: Add bio column if it doesn't exist (for existing databases)
             try:
@@ -118,22 +128,37 @@ def init_db():
                 pass  # Column already exists or error adding it
 
             try:
-                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT FALSE")
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_suspended BOOLEAN DEFAULT FALSE"
+                )
             except Exception:
                 pass  # Column already exists or error adding it
-            
+
+            # Migration: Add NIK and biometric data columns
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS nik TEXT")
+            except Exception:
+                pass  # Column already exists
+
+            try:
+                cursor.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS biometric_data TEXT"
+                )
+            except Exception:
+                pass  # Column already exists
+
             # Create loans table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS loans (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
                     amount DECIMAL(15, 2),
                     status TEXT DEFAULT 'pending'
                 )
-            ''')
-            
+            """)
+
             # Create transactions table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS transactions (
                     id SERIAL PRIMARY KEY,
                     from_account TEXT NOT NULL,
@@ -143,10 +168,10 @@ def init_db():
                     transaction_type TEXT NOT NULL,
                     description TEXT
                 )
-            ''')
-            
+            """)
+
             # Create virtual cards table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS virtual_cards (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -162,10 +187,10 @@ def init_db():
                     card_type TEXT DEFAULT 'standard',  -- Vulnerability: No validation on card type
                     currency TEXT DEFAULT 'USD'
                 )
-            ''')
+            """)
 
             # Create virtual card transactions table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS card_transactions (
                     id SERIAL PRIMARY KEY,
                     card_id INTEGER REFERENCES virtual_cards(id) ON DELETE CASCADE,
@@ -176,10 +201,10 @@ def init_db():
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     description TEXT
                 )
-            ''')
+            """)
 
             # Create merchants table for public vulnerable payment APIs
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS merchants (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL,
@@ -189,10 +214,10 @@ def init_db():
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """)
 
             # Create merchant payments table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS merchant_payments (
                     id SERIAL PRIMARY KEY,
                     merchant_id INTEGER REFERENCES merchants(id) ON DELETE CASCADE,
@@ -205,14 +230,28 @@ def init_db():
                     failure_reason TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            ''')
+            """)
 
             seeded_merchants = [
-                ('graphQL bookstore', 'bookstore@vulnbank.org', 'bookstore123', 'vk_fe675fe7aaee830b6fed09b64e034f84dcbdaeb429d9cccd4ebb90e15af8dd71', True),
-                ('PwnShop', 'pwnshop@vulnbank.org', 'pwnshop123', 'vk_b281bc2c616cb3c3a097215fdc9397ae87e6e06b156cc34e656be7a1a9ce8839', True)
+                (
+                    "graphQL bookstore",
+                    "bookstore@mybankgweh.org",
+                    "bookstore123",
+                    "vk_fe675fe7aaee830b6fed09b64e034f84dcbdaeb429d9cccd4ebb90e15af8dd71",
+                    True,
+                ),
+                (
+                    "PwnShop",
+                    "pwnshop@mybankgweh.org",
+                    "pwnshop123",
+                    "vk_b281bc2c616cb3c3a097215fdc9397ae87e6e06b156cc34e656be7a1a9ce8839",
+                    True,
+                ),
             ]
             for merchant in seeded_merchants:
-                cursor.execute("SELECT id FROM merchants WHERE email = %s", (merchant[1],))
+                cursor.execute(
+                    "SELECT id FROM merchants WHERE email = %s", (merchant[1],)
+                )
                 if cursor.fetchone():
                     cursor.execute(
                         """
@@ -220,7 +259,13 @@ def init_db():
                         SET name = %s, password = %s, api_key = %s, is_active = %s
                         WHERE email = %s
                         """,
-                        (merchant[0], merchant[2], merchant[3], merchant[4], merchant[1])
+                        (
+                            merchant[0],
+                            merchant[2],
+                            merchant[3],
+                            merchant[4],
+                            merchant[1],
+                        ),
                     )
                 else:
                     cursor.execute(
@@ -228,44 +273,52 @@ def init_db():
                         INSERT INTO merchants (name, email, password, api_key, is_active)
                         VALUES (%s, %s, %s, %s, %s)
                         """,
-                        merchant
+                        merchant,
                     )
 
             try:
-                cursor.execute("ALTER TABLE virtual_cards ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'USD'")
+                cursor.execute(
+                    "ALTER TABLE virtual_cards ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'USD'"
+                )
             except Exception:
                 pass
 
             try:
-                cursor.execute("ALTER TABLE virtual_cards ALTER COLUMN card_limit TYPE NUMERIC(20, 8)")
-                cursor.execute("ALTER TABLE virtual_cards ALTER COLUMN current_balance TYPE NUMERIC(20, 8)")
-                cursor.execute("ALTER TABLE card_transactions ALTER COLUMN amount TYPE NUMERIC(20, 8)")
+                cursor.execute(
+                    "ALTER TABLE virtual_cards ALTER COLUMN card_limit TYPE NUMERIC(20, 8)"
+                )
+                cursor.execute(
+                    "ALTER TABLE virtual_cards ALTER COLUMN current_balance TYPE NUMERIC(20, 8)"
+                )
+                cursor.execute(
+                    "ALTER TABLE card_transactions ALTER COLUMN amount TYPE NUMERIC(20, 8)"
+                )
             except Exception:
                 pass
-            
+
             # Create default admin account if it doesn't exist
             cursor.execute("SELECT * FROM users WHERE username='admin'")
             if not cursor.fetchone():
                 cursor.execute(
                     """
-                    INSERT INTO users (username, password, account_number, balance, is_admin) 
+                    INSERT INTO users (username, password, account_number, balance, is_admin)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
-                    ('admin', 'admin123', 'ADMIN001', 1000000.0, True)
+                    ("admin", "admin123", "ADMIN001", 1000000.0, True),
                 )
-            
+
             # Create bill categories table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bill_categories (
                     id SERIAL PRIMARY KEY,
                     name TEXT NOT NULL UNIQUE,
                     description TEXT,
                     is_active BOOLEAN DEFAULT TRUE
                 )
-            ''')
+            """)
 
             # Create billers table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS billers (
                     id SERIAL PRIMARY KEY,
                     category_id INTEGER REFERENCES bill_categories(id),
@@ -276,10 +329,10 @@ def init_db():
                     maximum_amount DECIMAL(15, 2),  -- Vulnerability: No validation
                     is_active BOOLEAN DEFAULT TRUE
                 )
-            ''')
+            """)
 
             # Create bill payments table
-            cursor.execute('''
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS bill_payments (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -293,12 +346,12 @@ def init_db():
                     processed_at TIMESTAMP,
                     description TEXT
                 )
-            ''')
+            """)
 
             # Insert default bill categories
             cursor.execute("""
-                INSERT INTO bill_categories (name, description) 
-                VALUES 
+                INSERT INTO bill_categories (name, description)
+                VALUES
                 ('Utilities', 'Water, Electricity, Gas bills'),
                 ('Telecommunications', 'Phone, Internet, Cable TV'),
                 ('Insurance', 'Life, Health, Auto insurance'),
@@ -308,8 +361,8 @@ def init_db():
 
             # Insert sample billers
             cursor.execute("""
-                INSERT INTO billers (category_id, name, account_number, description, minimum_amount) 
-                VALUES 
+                INSERT INTO billers (category_id, name, account_number, description, minimum_amount)
+                VALUES
                 (1, 'City Water', 'WATER001', 'City Water Utility', 10),
                 (1, 'PowerGen Electric', 'POWER001', 'Electricity Provider', 20),
                 (2, 'TeleCom Services', 'TEL001', 'Phone and Internet', 25),
@@ -318,10 +371,216 @@ def init_db():
                 (4, 'Universal Bank Card', 'CC001', 'Credit Card Payments', 50)
                 ON CONFLICT DO NOTHING
             """)
-            
+
+            # ============================================
+            # NEW: Modern Vulnerability Tables (2020-2025)
+            # ============================================
+
+            # --- OAuth 2.0 Clients (API Modern Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS oauth_clients (
+                    id SERIAL PRIMARY KEY,
+                    client_id TEXT NOT NULL UNIQUE,
+                    client_secret TEXT NOT NULL,  -- Vulnerability: Stored in plaintext
+                    client_name TEXT NOT NULL,
+                    redirect_uris TEXT NOT NULL,  -- Vulnerability: No strict redirect URI validation
+                    allowed_grant_types TEXT DEFAULT 'authorization_code,implicit',
+                    scopes TEXT DEFAULT 'read,write,transfer',
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS oauth_authorizations (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    client_id TEXT NOT NULL,
+                    code TEXT NOT NULL UNIQUE,
+                    redirect_uri TEXT NOT NULL,  -- Vulnerability: No redirect_uri validation
+                    scopes TEXT,
+                    expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL '10 minutes'),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Seed OAuth clients
+            cursor.execute(
+                "SELECT id FROM oauth_clients WHERE client_id = 'vuln-bank-demo-app'"
+            )
+            if not cursor.fetchone():
+                cursor.execute(
+                    """
+                    INSERT INTO oauth_clients (client_id, client_secret, client_name, redirect_uris, scopes)
+                    VALUES (%s, %s, %s, %s, %s)
+                """,
+                    (
+                        "vuln-bank-demo-app",
+                        "super-secret-client-secret-123",
+                        "Demo Banking App",
+                        "http://localhost:3000/callback,https://attacker.example.com/callback",
+                        "read,write,transfer,admin",
+                    ),
+                )
+
+            # --- Webhooks (API Modern Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS webhooks (
+                    id SERIAL PRIMARY KEY,
+                    merchant_id INTEGER REFERENCES merchants(id) ON DELETE CASCADE,
+                    url TEXT NOT NULL,  -- Vulnerability: No URL validation (SSRF possible)
+                    events TEXT NOT NULL,  -- Comma-separated: payment_success,payment_failed,etc
+                    secret TEXT,  -- Vulnerability: Optional and often empty
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # --- AI Knowledge Base (AI/LLM Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_knowledge_base (
+                    id SERIAL PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    content TEXT NOT NULL,  -- Vulnerability: No sanitization, poisoning possible
+                    category TEXT DEFAULT 'general',
+                    uploaded_by INTEGER REFERENCES users(id),
+                    is_approved BOOLEAN DEFAULT FALSE,  -- Vulnerability: Auto-approved if uploaded_by is admin
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Seed AI knowledge base
+            cursor.execute("SELECT id FROM ai_knowledge_base LIMIT 1")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO ai_knowledge_base (title, content, category, is_approved)
+                    VALUES
+                    ('Bank Hours', 'Our bank operates Monday-Friday 9AM-5PM. Saturday 9AM-1PM. Closed on Sundays and public holidays.', 'general', TRUE),
+                    ('Transfer Limits', 'Daily transfer limit is $10,000 for standard accounts and $50,000 for premium accounts.', 'policies', TRUE),
+                    ('Interest Rates', 'Savings account interest rate is 2.5% per annum. Fixed deposit rates start at 4.0% for 12 months.', 'general', TRUE)
+                """)
+
+            # --- AI Tools / MCP (AI/LLM Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_tools (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    description TEXT,
+                    tool_type TEXT NOT NULL,  -- 'transfer', 'query', 'action'
+                    endpoint TEXT,  -- External API endpoint for tool
+                    auth_required BOOLEAN DEFAULT TRUE,
+                    auth_token TEXT,  -- Vulnerability: Stored in plaintext, can be leaked
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Seed AI tools (MCP-style tools)
+            cursor.execute("SELECT id FROM ai_tools WHERE name = 'initiate_transfer'")
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO ai_tools (name, description, tool_type, endpoint, auth_required, auth_token)
+                    VALUES
+                    ('initiate_transfer', 'Initiate a money transfer on behalf of the user', 'transfer', '/api/transfer', TRUE, 'Bearer internal-ai-transfer-token'),
+                    ('query_balance', 'Query account balance for any user', 'query', '/api/check_balance', TRUE, 'Bearer internal-ai-query-token'),
+                    ('query_transaction_history', 'Retrieve transaction history for any account', 'query', '/api/transactions', TRUE, 'Bearer internal-ai-query-token'),
+                    ('update_user_profile', 'Update user profile information including balance', 'action', '/api/users/update', FALSE, NULL)
+                """)
+
+            # --- AI Agent Actions Log ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ai_agent_actions (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER REFERENCES users(id),
+                    action_type TEXT NOT NULL,  -- 'transfer', 'query', 'profile_update'
+                    action_details TEXT,  -- JSON string of action details
+                    ai_prompt TEXT,  -- The user prompt that triggered this
+                    status TEXT DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # --- Dependency Package Registry (Supply Chain Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS dependency_packages (
+                    id SERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    registry TEXT NOT NULL,  -- 'internal' or 'external'
+                    download_url TEXT,  -- Vulnerability: Can point to malicious packages
+                    checksum TEXT,  -- Vulnerability: Not validated
+                    published_by TEXT,
+                    is_verified BOOLEAN DEFAULT FALSE,  -- Vulnerability: Internal packages auto-verified
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(name, version, registry)
+                )
+            """)
+
+            # Migration: drop old UNIQUE(name) constraint if it exists, replace with composite key
+            cursor.execute("""
+                ALTER TABLE dependency_packages
+                DROP CONSTRAINT IF EXISTS dependency_packages_name_key;
+            """)
+
+            # Seed internal packages
+            cursor.execute(
+                "SELECT id FROM dependency_packages WHERE name = 'vuln-bank-sdk'"
+            )
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO dependency_packages (name, version, registry, download_url, published_by, is_verified)
+                    VALUES
+                    ('vuln-bank-sdk', '2.1.0', 'internal', 'https://registry.mybankgweh.org/packages/vuln-bank-sdk/2.1.0.tar.gz', 'internal-team', TRUE),
+                    ('vuln-bank-sdk', '2.0.0', 'external', 'https://registry.npmjs.org/vuln-bank-sdk/-/vuln-bank-sdk-2.0.0.tgz', 'unknown-publisher', FALSE),
+                    ('@mybank/auth-utils', '1.3.2', 'internal', 'https://registry.mybankgweh.org/packages/auth-utils/1.3.2.tar.gz', 'internal-team', TRUE)
+                """)
+
+            # --- CI/CD Pipeline Config (Supply Chain Vulnerability) ---
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS pipeline_configs (
+                    id SERIAL PRIMARY KEY,
+                    project_name TEXT NOT NULL,
+                    config_yaml TEXT NOT NULL,  -- Vulnerability: YAML config that can be manipulated
+                    environment TEXT DEFAULT 'production',
+                    created_by INTEGER REFERENCES users(id),
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Seed pipeline configs
+            cursor.execute(
+                "SELECT id FROM pipeline_configs WHERE project_name = 'vuln-bank'"
+            )
+            if not cursor.fetchone():
+                cursor.execute(
+                    """
+                    INSERT INTO pipeline_configs (project_name, config_yaml, environment)
+                    VALUES (%s, %s, %s)
+                """,
+                    (
+                        "vuln-bank",
+                        '''name: Deploy Pipeline
+steps:
+  - name: Build
+    image: vuln-bank-builder:latest
+    env:
+      DB_PASSWORD: "${{ secrets.DB_PASSWORD }}"
+      API_KEY: "${{ secrets.API_KEY }}"
+  - name: Test
+    run: pytest tests/
+  - name: Deploy
+    run: |
+      curl -X POST $DEPLOY_URL \
+        -H "Authorization: Bearer $DEPLOY_TOKEN" \
+        -F "image=vuln-bank:latest"''',
+                        "production",
+                    ),
+                )
+
             conn.commit()
             print("Database initialized successfully")
-            
+
     except Exception as e:
         # Vulnerability: Detailed error information exposed
         print(f"Error initializing database: {e}")
@@ -329,6 +588,7 @@ def init_db():
         raise e
     finally:
         return_connection(conn)
+
 
 def execute_query(query, params=None, fetch=True):
     """
@@ -343,7 +603,7 @@ def execute_query(query, params=None, fetch=True):
             if fetch:
                 result = cursor.fetchall()
             # Always commit for INSERT, UPDATE, DELETE operations
-            if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
+            if query.strip().upper().startswith(("INSERT", "UPDATE", "DELETE")):
                 conn.commit()
             return result
     except Exception as e:
@@ -352,6 +612,7 @@ def execute_query(query, params=None, fetch=True):
         raise e
     finally:
         return_connection(conn)
+
 
 def execute_transaction(queries_and_params):
     """

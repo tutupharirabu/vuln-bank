@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>⚠️ You've Been Phished — Awareness Training</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <style>
+      :root {
+        --bg: #0b1220;
+        --surface: #121b2e;
+        --border: #26344f;
+        --text-1: #f1f5f9;
+        --text-2: #aab6c9;
+        --text-3: #6b7a93;
+        --danger: #ef4444;
+        --danger-soft: rgba(239, 68, 68, 0.12);
+        --warn: #f59e0b;
+        --ok: #10b981;
+        --brand: #007bff;
+        --r: 14px;
+        --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: var(--font);
+        background: radial-gradient(
+            circle at 20% -10%, rgba(239, 68, 68, 0.18), transparent 45%
+          ), var(--bg);
+        color: var(--text-1);
+        min-height: 100vh;
+        padding: 2.5rem 1.25rem 4rem;
+        line-height: 1.6;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; }
+      .alert-badge {
+        display: inline-flex; align-items: center; gap: 0.5rem;
+        background: var(--danger-soft); color: var(--danger);
+        border: 1px solid rgba(239, 68, 68, 0.35);
+        font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em;
+        text-transform: uppercase; padding: 0.4rem 0.9rem;
+        border-radius: 999px; margin-bottom: 1.5rem;
+      }
+      .pulse {
+        width: 8px; height: 8px; background: var(--danger);
+        border-radius: 50%; animation: pulse 1.8s infinite;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+      }
+      @keyframes pulse {
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+      }
+      h1 { font-size: 2.1rem; line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 0.75rem; }
+      .lede { color: var(--text-2); font-size: 1.08rem; margin-bottom: 2rem; }
+      .card {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: var(--r); padding: 1.5rem; margin-bottom: 1.25rem;
+      }
+      .card h2 { font-size: 1.05rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+      .captured { border-color: rgba(239, 68, 68, 0.4); background: linear-gradient(180deg, var(--danger-soft), var(--surface)); }
+      .cred-row {
+        display: flex; justify-content: space-between; align-items: center;
+        gap: 1rem; padding: 0.75rem 1rem; background: var(--bg);
+        border: 1px solid var(--border); border-radius: 10px;
+        margin-bottom: 0.6rem; font-family: "JetBrains Mono", ui-monospace, monospace;
+      }
+      .cred-row .k { color: var(--text-3); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+      .cred-row .v { color: var(--text-1); font-weight: 600; word-break: break-all; text-align: right; }
+      .cred-note { font-size: 0.85rem; color: var(--text-3); margin-top: 0.75rem; }
+      ul.flags { list-style: none; display: grid; gap: 0.85rem; }
+      ul.flags li { display: flex; gap: 0.75rem; align-items: flex-start; }
+      ul.flags .ico {
+        flex: 0 0 auto; width: 24px; height: 24px; border-radius: 7px;
+        background: rgba(245, 158, 11, 0.15); color: var(--warn);
+        display: grid; place-items: center; font-weight: 800; font-size: 0.85rem;
+      }
+      ul.flags strong { display: block; color: var(--text-1); }
+      ul.flags span { color: var(--text-2); font-size: 0.92rem; }
+      .steps { counter-reset: s; list-style: none; display: grid; gap: 0.75rem; }
+      .steps li { counter-increment: s; position: relative; padding-left: 2.4rem; color: var(--text-2); }
+      .steps li::before {
+        content: counter(s); position: absolute; left: 0; top: -2px;
+        width: 1.6rem; height: 1.6rem; border-radius: 50%;
+        background: var(--ok); color: #04130c; font-weight: 800;
+        display: grid; place-items: center; font-size: 0.85rem;
+      }
+      .steps strong { color: var(--text-1); }
+      .footer-note {
+        margin-top: 2rem; padding: 1rem 1.25rem; border-left: 3px solid var(--ok);
+        background: rgba(16, 185, 129, 0.08); border-radius: 0 10px 10px 0;
+        font-size: 0.9rem; color: var(--text-2);
+      }
+      .footer-note strong { color: var(--ok); }
+      .footer-note code { background: rgba(255,255,255,0.06); padding: 0.1rem 0.4rem; border-radius: 5px; }
+      .btn {
+        display: inline-block; margin-top: 1.5rem; background: var(--brand);
+        color: #fff; text-decoration: none; font-weight: 600;
+        padding: 0.7rem 1.4rem; border-radius: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <span class="alert-badge"><span class="pulse"></span> Phishing Simulation</span>
+      <h1>Gotcha — this was a phishing test. 🎣</h1>
+      <p class="lede">
+        Halaman login tadi <strong>bukan</strong> My Bank Gweh yang asli — itu
+        tiruan, dan pesan "Invalid credentials" tadi palsu. Ini latihan
+        keamanan. Kalau ini serangan sungguhan, penyerang baru saja mendapatkan
+        apa yang kamu ketik di bawah ini.
+      </p>
+
+      <div class="card captured">
+        <h2>🔓 Yang barusan kamu serahkan</h2>
+        <div id="credBox">
+          <div class="cred-row">
+            <span class="k">Username</span><span class="v" id="vUser">—</span>
+          </div>
+          <div class="cred-row">
+            <span class="k">Password</span><span class="v" id="vPass">—</span>
+          </div>
+        </div>
+        <p class="cred-note">
+          Ditampilkan dari browser kamu sendiri sebagai bukti, lalu langsung
+          dihapus. Password asli <strong>tidak</strong> dikirim ke server —
+          dashboard kampanye hanya menyimpan versi tersamar.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>🚩 Tanda yang seharusnya kamu curigai</h2>
+        <ul class="flags">
+          <li>
+            <span class="ico">!</span>
+            <span><strong>Periksa URL / domain</strong>Alamat situs bukan domain
+              resmi bank. Phisher pakai domain mirip (typosquatting) atau
+              subdomain menyesatkan.</span>
+          </li>
+          <li>
+            <span class="ico">!</span>
+            <span><strong>"Invalid credentials" lalu coba lagi</strong>Trik
+              klasik: bilang gagal supaya kamu mengetik ulang dan menyerahkan
+              kredensial yang benar.</span>
+          </li>
+          <li>
+            <span class="ico">!</span>
+            <span><strong>Cara kamu sampai ke sini</strong>Datang dari link di
+              email / chat / SMS yang mendesak? Itu pola umum phishing.</span>
+          </li>
+          <li>
+            <span class="ico">!</span>
+            <span><strong>Gembok ≠ aman</strong>HTTPS hanya berarti koneksi
+              terenkripsi, bukan situsnya tepercaya.</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>✅ Yang harus dilakukan lain kali</h2>
+        <ol class="steps">
+          <li><strong>Ketik sendiri</strong> alamat bank di browser, jangan klik link.</li>
+          <li><strong>Cek domain</strong> huruf per huruf sebelum memasukkan kredensial.</li>
+          <li><strong>Aktifkan MFA</strong> supaya password bocor saja tidak cukup.</li>
+          <li><strong>Pakai password manager</strong> — ia menolak autofill di domain palsu.</li>
+          <li><strong>Laporkan</strong> email/pesan mencurigakan ke tim keamanan.</li>
+        </ol>
+      </div>
+
+      <div class="footer-note">
+        <strong>Catatan untuk fasilitator:</strong> ini lingkungan latihan.
+        Password disimpan <strong>tersamar</strong>; metrik kampanye &
+        credential (masked) ada di <code>/credentials</code>.
+      </div>
+
+      <a class="btn" href="/login">↩ Kembali ke demo</a>
+    </div>
+
+    <script>
+      (function () {
+        try {
+          const raw = sessionStorage.getItem("phish_demo_typed");
+          if (raw) {
+            const d = JSON.parse(raw);
+            if (d.username) document.getElementById("vUser").textContent = d.username;
+            if (d.password) document.getElementById("vPass").textContent = d.password;
+          }
+        } catch (e) {}
+        sessionStorage.removeItem("phish_demo_typed");
+      })();
+    </script>
+  </body>
+</html>

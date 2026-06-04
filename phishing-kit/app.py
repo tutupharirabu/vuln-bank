@@ -1,3 +1,4 @@
+from email_sender import build_email, send_email
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 from database import (
@@ -101,18 +102,93 @@ def reveal():
     return render_template("phishing_reveal.html")
 
 
-@app.route("/credentials")
-def credentials_dashboard():
-    """Awareness campaign dashboard — gabungkan stats + credential."""
+@app.route("/dashboard")
+def campaign_dashboard():
+    """Campaign dashboard — stats, captured credentials, dan email campaign."""
     credentials = get_demo_credentials()
     stats = get_stats()
-    return render_template("credentials.html", credentials=credentials, stats=stats)
+    email_stats = get_stats()
+    return render_template(
+        "dashboard.html",
+        credentials=credentials,
+        stats=stats,
+        email_stats=email_stats,
+    )
+
+
+@app.route("/dashboard/clear", methods=["POST"])
+def clear_credentials():
+    clear_demo_credentials()
+    return redirect(url_for("campaign_dashboard"))
+
+
+# Backward-compatible redirect
+@app.route("/credentials")
+def credentials_redirect():
+    return redirect(url_for("campaign_dashboard"))
 
 
 @app.route("/credentials/clear", methods=["POST"])
-def clear_credentials():
+def credentials_clear_redirect():
     clear_demo_credentials()
-    return redirect(url_for("credentials_dashboard"))
+    return redirect(url_for("campaign_dashboard"))
+
+
+@app.route("/api/email/send", methods=["POST"])
+def api_send_email():
+    """Kirim email phishing simulasi ke satu atau banyak target via Mailtrap API.
+
+    Body JSON:
+    {
+        "targets": ["user1@example.com", "user2@example.com"],
+        "phishing_url": "http://localhost:5555/login",
+        "subject": "optional custom subject",
+        "employee_name": "optional name for letterhead"
+    }
+    """
+    data = request.get_json(silent=True) or {}
+    targets = data.get("targets", [])
+
+    if not targets:
+        return jsonify({"status": "error", "error": "targets is required"}), 400
+
+    phishing_url = data.get("phishing_url", "http://localhost:5555/login")
+
+    email_kwargs = {}
+    for key in ("subject", "from_email", "from_name", "employee_name"):
+        if key in data:
+            email_kwargs[key] = data[key]
+
+    results = []
+    for target in targets:
+        result = send_email(to_email=target, phishing_url=phishing_url, **email_kwargs)
+        results.append(result)
+
+    sent = sum(1 for r in results if r["status"] == "sent")
+    record_event(
+        event_type="email_campaign",
+        target_label=f"{sent}/{len(targets)} sent",
+        ip_address=request.remote_addr,
+        user_agent=request.headers.get("User-Agent", ""),
+    )
+
+    return jsonify(
+        {"status": "ok", "sent": sent, "total": len(targets), "results": results}
+    )
+
+
+@app.route("/api/email/preview")
+def api_email_preview():
+    """Preview HTML email yang akan dikirim (untuk debugging)."""
+    phishing_url = request.args.get("url", "http://localhost:5555/login")
+    msg = build_email(
+        to_email="preview@example.com",
+        phishing_url=phishing_url,
+    )
+    for part in msg.walk():
+        if part.get_content_type() == "text/html":
+            return part.get_payload(decode=True).decode("utf-8")
+    return "No HTML part found", 500
 
 
 if __name__ == "__main__":

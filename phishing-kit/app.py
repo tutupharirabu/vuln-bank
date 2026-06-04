@@ -152,7 +152,9 @@ def api_send_email():
     if not targets:
         return jsonify({"status": "error", "error": "targets is required"}), 400
 
-    phishing_url = data.get("phishing_url", "http://localhost:5555/login")
+    phishing_url = data.get(
+        "phishing_url", "https://vps-8e61f88c.tail25f2a6.ts.net/login"
+    )
 
     email_kwargs = {}
     for key in ("subject", "from_email", "from_name", "employee_name"):
@@ -180,7 +182,9 @@ def api_send_email():
 @app.route("/api/email/preview")
 def api_email_preview():
     """Preview HTML email yang akan dikirim (untuk debugging)."""
-    phishing_url = request.args.get("url", "http://localhost:5555/login")
+    phishing_url = request.args.get(
+        "url", "https://vps-8e61f88c.tail25f2a6.ts.net/login"
+    )
     msg = build_email(
         to_email="preview@example.com",
         phishing_url=phishing_url,
